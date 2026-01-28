@@ -1,0 +1,154 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Monitoring Pegawai - Balai DALKARHUT</title>
+    
+    <!-- Library CSS & JS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Plugin untuk menampilkan angka di grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; font-style: normal; }
+        #sidebar { transition: margin-left 0.3s ease-in-out, transform 0.3s ease-in-out; }
+        .sidebar-hidden { margin-left: -16rem; }
+        @media (max-width: 768px) {
+            #sidebar { position: fixed; height: 100vh; z-index: 50; margin-left: 0; transform: translateX(-100%); }
+            #sidebar.mobile-open { transform: translateX(0); }
+        }
+        .page-content { display: none; opacity: 0; transition: opacity 0.4s ease; }
+        .page-content.active { display: block; opacity: 1; }
+        .loader { border-top-color: #059669; animation: spinner 1s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 overflow-hidden text-gray-800">
+
+    <div id="loading-screen" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
+        <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-16 w-16 mb-4"></div>
+        <p class="text-emerald-900 font-extrabold text-xs tracking-widest uppercase animate-pulse">Memproses Data Pegawai...</p>
+    </div>
+
+    <div class="flex h-screen">
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="w-64 bg-emerald-900 text-white flex flex-col shrink-0 shadow-2xl overflow-y-auto">
+            <div class="p-6 text-center border-b border-emerald-800 shrink-0 uppercase font-bold">
+                <h2 class="text-xl font-black tracking-tight uppercase leading-tight">
+                    <span class="text-emerald-400 text-[10px] block font-normal tracking-[0.2em] mb-1 uppercase">Balai</span>
+                    DALKARHUT 
+                    <span class="text-emerald-400 text-[10px] block font-normal tracking-[0.2em] mb-1 uppercase leading-tight">Wilayah Jawa Bali Nusa Tenggara</span>
+                </h2>
+            </div>
+            
+            <nav id="sidebar-nav" class="flex-1 p-4 space-y-1 mt-4 text-sm font-medium uppercase">
+                <button onclick="showPage('dashboard', this)" class="nav-link w-full flex items-center space-x-3 p-3 bg-emerald-700 text-white rounded-xl transition">
+                    <i class="fas fa-chart-line w-5"></i> <span>Dashboard</span>
+                </button>
+                <button onclick="showPage('all-data', this)" class="nav-link w-full flex items-center space-x-3 p-3 hover:bg-emerald-800 text-gray-300 rounded-xl transition group">
+                    <i class="fas fa-users w-5 group-hover:text-emerald-400"></i> <span>Data Pegawai</span>
+                </button>
+                <button onclick="showPage('subag-tu', this)" class="nav-link w-full flex items-center space-x-3 p-3 hover:bg-emerald-800 text-gray-300 rounded-xl transition group">
+                    <i class="fas fa-file-invoice w-5 group-hover:text-emerald-400"></i> <span>Subag TU</span>
+                </button>
+                
+                <div class="pt-6 pb-2 px-3 text-[10px] font-bold text-emerald-500 uppercase tracking-widest border-t border-emerald-800 mt-4 uppercase">Wilayah Kerja</div>
+                
+                <button onclick="showPage('sekwil-1', this)" class="nav-link w-full flex items-center space-x-3 p-3 hover:bg-emerald-800 text-gray-300 rounded-xl transition group">
+                    <i class="fas fa-map-pin w-5 group-hover:text-emerald-400"></i> <span>Seksi Wilayah I</span>
+                </button>
+                <button onclick="showPage('sekwil-2', this)" class="nav-link w-full flex items-center space-x-3 p-3 hover:bg-emerald-800 text-gray-300 rounded-xl transition group">
+                    <i class="fas fa-map-pin w-5 group-hover:text-emerald-400"></i> <span>Seksi Wilayah II</span>
+                </button>
+                <button onclick="showPage('sekwil-3', this)" class="nav-link w-full flex items-center space-x-3 p-3 hover:bg-emerald-800 text-gray-300 rounded-xl transition group">
+                    <i class="fas fa-map-pin w-5 group-hover:text-emerald-400"></i> <span>Seksi Wilayah III</span>
+                </button>
+            </nav>
+            <div class="p-4 border-t border-emerald-800 text-[10px] text-center text-emerald-500 font-bold shrink-0 tracking-widest uppercase">&copy; 2026 Balai Dalkarhut</div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-gray-50">
+            <header class="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-30 uppercase font-bold text-gray-700">
+                <div class="flex items-center space-x-4">
+                    <button onclick="toggleSidebar()" class="text-emerald-800 p-2 hover:bg-emerald-50 rounded-lg transition"><i class="fas fa-bars text-xl"></i></button>
+                    <h3 id="page-title" class="font-bold text-xs md:text-sm uppercase">Dashboard</h3>
+                </div>
+                <div class="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-bold ring-4 ring-emerald-50 uppercase shadow-lg">ED</div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-8">
+                <!-- PAGE: DASHBOARD -->
+                <section id="page-dashboard" class="page-content active uppercase font-bold">
+                    <div class="bg-white p-8 md:p-12 rounded-[2rem] shadow-sm border border-gray-100 max-w-5xl">
+                        <h2 class="text-4xl font-black text-emerald-900 mt-4 mb-6 leading-tight uppercase">Balai DALKARHUT</h2>
+                        <p class="text-gray-500 font-normal normal-case mb-8 text-sm md:text-base">Balai Dalkarhut berperan dalam pengendalian kebakaran hutan dan lahan di wilayah Jawa, Bali, dan Nusa Tenggara. Dengan dukungan tim yang solid dan sistem kerja terintegrasi, unit ini memastikan pengelolaan sumber daya dan respons operasional berjalan efektif dan terkoordinasi.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 uppercase font-bold">
+                            <div class="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+                                <h5 class="font-black text-xs text-emerald-800 uppercase">STRUKTUR UTAMA</h5>
+                                <p class="text-[10px] text-gray-500 mt-2 font-normal">Struktur organisasi dirancang untuk mendukung koordinasi lintas fungsi. Sub Bagian Tata Usaha dan tiga Seksi Wilayah bekerja selaras dalam mengoordinasikan Manggala Agni, sehingga perencanaan, pelaksanaan, dan pengendalian tugas dapat berjalan efisien dan terarah.</p>
+                            </div>
+                            <div class="p-6 bg-blue-50 rounded-3xl border border-blue-100">
+                                <h5 class="font-black text-xs text-blue-800">DASHBOARD SDM</h5>
+                                <p class="text-[10px] text-gray-500 mt-2 font-normal">Dashboard SDM menyajikan data pegawai secara terpusat dan real-time dengan tepat. Sistem ini akan memudahkan pemantauan sebaran, kondisi, dan kebutuhan sumber daya manusia, serta mendukung perencanaan dan pengambilan keputusan berbasis data secara tepat dan efektif.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PAGE: DATA CONTAINER -->
+                <section id="page-data-container" class="page-content uppercase font-bold">
+                    <div id="stats-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-gradient-to-br from-blue-600 to-blue-700 p-6 rounded-3xl shadow-xl text-white">
+                            <p class="text-blue-100 text-[10px] font-bold uppercase tracking-widest opacity-80 uppercase">Total Pegawai</p>
+                            <h3 id="card-total" class="text-4xl font-black mt-2 leading-none animate-pulse">-</h3>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-3xl shadow-xl text-white">
+                            <p class="text-emerald-100 text-[10px] font-bold uppercase tracking-widest opacity-80 uppercase">PNS</p>
+                            <h3 id="card-pns" class="text-4xl font-black mt-2 leading-none">-</h3>
+                        </div>
+                        <div class="bg-gradient-to-br from-amber-500 to-amber-600 p-6 rounded-3xl shadow-xl text-white">
+                            <p class="text-amber-100 text-[10px] font-bold uppercase tracking-widest opacity-80 uppercase">CPNS</p>
+                            <h3 id="card-cpns" class="text-4xl font-black mt-2 leading-none">-</h3>
+                        </div>
+                        <div class="bg-gradient-to-br from-rose-600 to-rose-700 p-6 rounded-3xl shadow-xl text-white">
+                            <p class="text-rose-100 text-[10px] font-bold uppercase tracking-widest opacity-80 uppercase">PPPK</p>
+                            <h3 id="card-pppk" class="text-4xl font-black mt-2 leading-none">-</h3>
+                        </div>
+                    </div>
+
+                    <div id="charts-area" class="mb-8"></div>
+
+                    <div class="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="p-8 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center bg-gray-50 gap-4">
+                            <h4 class="text-emerald-900 font-black text-xs uppercase tracking-widest">Database Pegawai Terkini</h4>
+                            <input type="text" id="innerSearch" onkeyup="filterTableInPage()" placeholder="Cari Nama..." class="text-xs border-2 border-gray-200 rounded-2xl px-5 py-3 w-full md:w-80 outline-none focus:border-emerald-500 shadow-inner font-bold uppercase">
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-[11px] font-bold tracking-widest uppercase">
+                                <thead class="bg-emerald-900 text-emerald-100 font-bold uppercase">
+                                    <tr>
+                                        <th class="px-6 py-5 text-center uppercase">No</th>
+                                        <th class="px-6 py-5 uppercase">Nama / NIP</th>
+                                        <th class="px-6 py-5 uppercase">Jabatan / Eselon IV</th>
+                                        <th class="px-6 py-5 text-center uppercase">Status ASN</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mainTableBody" class="divide-y divide-gray-100 bg-white uppercase font-bold"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Pemanggil file JS eksternal -->
+    <script src="script.js"></script>
+</body>
+</html>
